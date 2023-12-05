@@ -4,13 +4,31 @@ import random
 import math
 
 from scipy.spatial import KDTree
-from attractor import Attractor
-from node import Node
+from sca.attractor import Attractor
+from sca.node import Node
+
+
+def pnt2line(pnt, start, end):
+    line_vec = end - start
+    pnt_vec = pnt - start
+    line_len = np.linalg.norm(line_vec)
+    line_unitvec = line_vec / line_len
+    pnt_vec_scaled = pnt_vec * (1.0/line_len)
+    t = np.dot(line_unitvec, pnt_vec_scaled)
+    if t < 0.0:
+        t = 0.0
+    elif t > 1.0:
+        t = 1.0
+    nearest = line_vec * t
+    dist = np.linalg.norm(pnt_vec - nearest) # distance(nearest, pnt_vec)
+    nearest = nearest + start
+    return dist
 
 
 class SpaceColonization:
-    attraction_points: []
-    nodes: []
+    attraction_points: [Attractor]
+    nodes: [Node]
+    root_node: Node
     kdtree: KDTree
 
     # constant parameters
@@ -19,8 +37,6 @@ class SpaceColonization:
     step_size: float = 0.02
 
     def __init__(self):
-        # Seed Random
-        random.seed(7)
 
         # Create a set of attraction points
         self.attraction_points = []
@@ -36,7 +52,8 @@ class SpaceColonization:
 
         # Create a set of nodes
         self.nodes = []
-        self.nodes.append(Node(np.array([0.5, 0.5, -1]), parent=None))
+        self.root_node = Node(np.array([0.5, 0.5, -1]), parent=None)
+        self.nodes.append(self.root_node)
 
         # Build spatial Index
         self.kdtree = None
@@ -72,13 +89,24 @@ class SpaceColonization:
         fresh_nodes = []
         for n in self.nodes:
             if len(n.influenced_by) > 0:
+                # Calculate direction of growth
                 direction = np.array([.0,.0,.0])
                 atr: Attractor
                 for atr in n.influenced_by:
                     direction += atr.position - n.position
+
+                # Special degen case
+                if len(n.influenced_by) == 2:
+                    center = (n.influenced_by[0].position + n.influenced_by[1].position) / 2
+                    if np.linalg.norm(n.position - center) < self.step_size:
+                        direction = n.influenced_by[0].position - n.position
+
                 direction /= np.linalg.norm(direction)
                 new_pos = n.position + direction * self.step_size
-                fresh_nodes.append(Node(new_pos, parent=n))
+                new_node = Node(new_pos, parent=n)
+                # Set as child in n
+                n.children.append(new_node)
+                fresh_nodes.append(new_node)
 
         for n in fresh_nodes:
             self.nodes.append(n)
@@ -95,10 +123,33 @@ class SpaceColonization:
         self.build_spatial_index()
 
 
-    def get_drawables(self):
+    def segment_traverse(self, node):
+        #Leaf
+        if len(node.children) == 0:
+            return [node.position]
+        #Segment
+        if len(node.children) == 1:
+            return [node.position] + self.segment_traverse(node.children[0])
+        #Branch
+        if len(node.children) >= 2:
+            for cn in node.children:
+                self.new_segment(cn)
+            return [node.position]
+
+    all_segments = []
+    def new_segment(self,start_node):
+        self.all_segments.append(self.segment_traverse(start_node))
+
+    def visualize_gc(self):
+        self.new_segment(self.root_node)
+        print(f"no of segs: {len(self.all_segments)}")
+
+
+    def visualize_with_spheres(self):
         # Define some colors
         color_dark = [0.1, 0.1, 0.1]
         color_red = [1, 0, 0]
+        color_green = [0, 1, 0]
         color_blue = [0, 0, 1]
 
         # Drawing code
@@ -114,7 +165,10 @@ class SpaceColonization:
 
         # Draw nodes
         for n in self.nodes:
-            all_drawables.append(draw_point(n.position, color_red))
+            if n.is_degen:
+                all_drawables.append(draw_point(n.position, color_green))
+            else:
+                all_drawables.append(draw_point(n.position, color_red))
 
         return all_drawables
 
@@ -183,15 +237,19 @@ if __name__ == "__main__":
     def advance_key_callback(vis: o3d.visualization.Visualizer):
         vis.clear_geometries()
         sca.update()
-        for geom in sca.get_drawables():
+        for geom in sca.visualize_with_spheres():
             vis.add_geometry(geom,reset_bounding_box=False)
 
     def advance2_key_callback(vis: o3d.visualization.Visualizer):
         vis.clear_geometries()
         for i in range(10):
             sca.update()
-        for geom in sca.get_drawables():
+        for geom in sca.visualize_with_spheres():
             vis.add_geometry(geom,reset_bounding_box=False)
 
-    key_to_callback = {ord("A"): advance_key_callback, ord("S"): advance2_key_callback}
-    o3d.visualization.draw_geometries_with_key_callbacks(sca.get_drawables(), key_to_callback)
+    def print_segs_callback(vis: o3d.visualization.Visualizer):
+        sca.all_segments = []
+        sca.visualize_gc()
+
+    key_to_callback = {ord("A"): advance_key_callback, ord("S"): advance2_key_callback, ord("D"): print_segs_callback}
+    o3d.visualization.draw_geometries_with_key_callbacks(sca.visualize_with_spheres(), key_to_callback)
