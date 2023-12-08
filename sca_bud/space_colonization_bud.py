@@ -23,7 +23,7 @@ class SpaceColonizationWithBuds:
     kill_distance: float = 0.05
     step_size: float = 0.01
     heading_w: float = 0.8
-    angle_gamma: float = degree2rads(85)
+    angle_gamma: float = degree2rads(90)
     angle_beta: float = degree2rads(137.5)
     max_angle_deviation: float = degree2rads(20)
     max_branch_depth: int = 1
@@ -107,11 +107,11 @@ class SpaceColonizationWithBuds:
                     if no_of_valid_attr == 0:
                         continue
 
-                    if n.branch_depth == self.max_branch_depth:
+                    if self.max_branch_depth != -1 and n.branch_depth == self.max_branch_depth:
                         continue
 
-                    if n.dist_to_bud / n.dist_to_root > (1 / (n.branch_depth + 1)):
-                        continue
+                    # if n.dist_to_bud / n.dist_to_root > (1 / (n.branch_depth + 1)):
+                    #     continue
 
                     direction /= np.linalg.norm(direction)
                     dir2 = self.heading_w * n.bud_heading + (1 - self.heading_w) * direction
@@ -246,7 +246,7 @@ class SpaceColonizationWithBuds:
         s.translate(pt)
         return s
 
-    def visualize_with_spheres(self):
+    def visualize_with_spheres(self, draw_buds=True, draw_attractors=True):
         # Define some colors
         color_dark = [0.1, 0.1, 0.1]
         color_red = [1, 0, 0]
@@ -259,11 +259,12 @@ class SpaceColonizationWithBuds:
         # all_drawables.append(draw_coordinate_box())
 
         # Draw attraction points
-        for ap in self.attraction_points:
-            if len(ap.influencing_nodes) > 0:
-                all_drawables.append(self.draw_point(ap.position, color_blue))
-            else:
-                all_drawables.append(self.draw_point(ap.position, color_dark))
+        if draw_attractors:
+            for ap in self.attraction_points:
+                if len(ap.influencing_nodes) > 0:
+                    all_drawables.append(self.draw_point(ap.position, color_blue))
+                else:
+                    all_drawables.append(self.draw_point(ap.position, color_dark))
 
         # Draw nodes
         for n in self.nodes:
@@ -271,8 +272,11 @@ class SpaceColonizationWithBuds:
                 # all_drawables.append(get_arrow(n.position,vec=n.heading, color=color_green))
                 all_drawables.append(self.draw_point(n.position, color_green))
             elif n.is_bud:
-                all_drawables.append(get_arrow(n.position, vec=n.bud_heading, color=color_yellow))
-                all_drawables.append(self.draw_point(n.position, color_yellow))
+                if draw_buds:
+                    all_drawables.append(get_arrow(n.position, vec=n.bud_heading, color=color_yellow))
+                    all_drawables.append(self.draw_point(n.position, color_yellow))
+                else:
+                    all_drawables.append(self.draw_point(n.position, color_red))
             else:
                 all_drawables.append(self.draw_point(n.position, color_red))
 

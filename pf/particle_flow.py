@@ -53,7 +53,7 @@ class ParticleFlow:
             return distance, None
 
     def draw_point(self, pt, color):
-        s = o3d.geometry.TriangleMesh.create_sphere(radius=0.01)
+        s = o3d.geometry.TriangleMesh.create_sphere(radius=0.005)
         s.paint_uniform_color(color)
         s.compute_vertex_normals()
         s.translate(pt)

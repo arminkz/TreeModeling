@@ -3,15 +3,8 @@ import open3d as o3d
 import laspy
 import random
 import math
-
-
-from sca.attractor import Attractor
-from sca.space_colonization import SpaceColonization
-from pf.particle_flow import ParticleFlow
 from sca_bud.space_colonization_bud import SpaceColonizationWithBuds
-
-# Seed Random
-random.seed(7)
+from sca_bud.attractor import Attractor
 
 
 def rotation_matrix(axis, theta):
@@ -28,26 +21,6 @@ def rotation_matrix(axis, theta):
     return np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
                      [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
                      [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
-
-
-def get_random_point_in_sphere(radius):
-    u = random.random()
-    x1 = random.random() - 0.5
-    x2 = random.random() - 0.5
-    x3 = random.random() - 0.5
-
-    mag = math.sqrt(x1 * x1 + x2 * x2 + x3 * x3)
-    x1 /= mag
-    x2 /= mag
-    x3 /= mag
-
-    c = u ** (1. / 3.)
-    return np.array([x1 * c, x2 * c, x3 * c]) + np.array([0, 0, 0.5])
-
-
-def sigmoid(x):
-  return 1 / (1 + math.exp(-x))
-
 
 def generate_sweep_surface(segment):
     """
@@ -122,61 +95,28 @@ def generate_sweep_surface(segment):
     sweep_mesh.paint_uniform_color([135 / 256, 62 / 256, 35 / 256])
     return sweep_mesh
 
-# Generate Random Points
-# attraction_pts = []
-# n_attraction_pts = 600
-# for i in range(n_attraction_pts):
-#     rpos = get_random_point_in_sphere()
-#     attraction_pts.append(Attractor(rpos))
-# attraction_pts.append(Attractor(np.array([0.5, 0.5, -0.4])))
-# attraction_pts.append(Attractor(np.array([0.5, 0.5, -0.5])))
-# attraction_pts.append(Attractor(np.array([0.5, 0.5, -0.6])))
-# attraction_pts.append(Attractor(np.array([0.5, 0.5, -0.7])))
-# attraction_pts.append(Attractor(np.array([0.5, 0.5, -0.8])))
+def get_random_point_in_sphere(radius):
+    u = random.random()
+    x1 = random.random() - 0.5
+    x2 = random.random() - 0.5
+    x3 = random.random() - 0.5
 
-# Root
-# root_pos = np.array([0.5, 0.5, -1])
+    mag = math.sqrt(x1 * x1 + x2 * x2 + x3 * x3)
+    x1 /= mag
+    x2 /= mag
+    x3 /= mag
 
-# print("running SCA...")
-# sca = SpaceColonization(attraction_pts, root_pos)
-# sca.run()
-# skeleton = sca.get_skeleton()
-#
-# all_sweep_meshes = []
-# for seg in skeleton:
-#     print(seg)
-#     m = generate_sweep_surface(seg)
-#     all_sweep_meshes.append(m)
-# all_sweep_meshes.append(generate_sweep_surface(skeleton[0]))
-# o3d.visualization.draw_geometries(all_sweep_meshes)
-
-# initial_positions = []
-# n_inner_pts = 100
-# for i in range(n_inner_pts):
-#     rpos = get_random_point_in_sphere()
-#     initial_positions.append(rpos)
-#
-# pf = ParticleFlow(initial_positions,root_pos)
-# pf.run()
-# skeleton = pf.get_skeleton()
-#
-# all_sweep_meshes = []
-# for seg in skeleton:
-#     print(seg)
-#     m = generate_sweep_surface(seg)
-#     all_sweep_meshes.append(m)
-# # all_sweep_meshes.append(generate_sweep_surface(skeleton[0]))
-# o3d.visualization.draw_geometries(all_sweep_meshes)
-
+    c = u ** (1. / 3.)
+    return np.array([x1 * c, x2 * c, x3 * c]) + np.array([0, 0, 0.5])
 
 # Load LAS file
 las = laspy.read("isolated_tree_las/bc_sample_tree.las")
 
-print(las.header)
-print(las.header.point_format)
-print(f"Point count : {las.header.point_count} ")
-print(las.vlrs)
-print(list(las.point_format.dimension_names))
+# print(las.header)
+# print(las.header.point_format)
+# print(f"Point count : {las.header.point_count} ")
+# print(las.vlrs)
+# print(list(las.point_format.dimension_names))
 
 # Normalize Z
 z_r = (np.max(las.Z) - np.min(las.Z))
@@ -195,9 +135,9 @@ normalizedX = las.X.astype(dtype="float64") / x_r
 normalizedY = las.Y.astype(dtype="float64") / x_r
 normalizedZ = las.Z.astype(dtype="float64") / x_r
 
-print(f"X {np.min(normalizedX)} {np.max(normalizedX)}")
-print(f"Y {np.min(normalizedY)} {np.max(normalizedY)}")
-print(f"Z {np.min(normalizedZ)} {np.max(normalizedZ)}")
+# print(f"X {np.min(normalizedX)} {np.max(normalizedX)}")
+# print(f"Y {np.min(normalizedY)} {np.max(normalizedY)}")
+# print(f"Z {np.min(normalizedZ)} {np.max(normalizedZ)}")
 
 point_data = np.stack([normalizedX, normalizedY, normalizedZ], axis=0).transpose((1, 0))
 color_data = np.stack([las.red, las.green, las.blue], axis=0).transpose((1, 0)) / 65024
@@ -206,67 +146,86 @@ geom = o3d.geometry.PointCloud()
 geom.points = o3d.utility.Vector3dVector(point_data)
 geom.colors = o3d.utility.Vector3dVector(color_data)
 
-#o3d.visualization.draw_geometries([geom])
 
+# For each point we have an attractor
+attraction_pts = []
+for i in range(0,point_data.shape[0],2):
+    attraction_pts.append(Attractor(point_data[i]))
+
+# Enrich Inside of point cloud
 hull, _ = geom.compute_convex_hull()
 scene = o3d.t.geometry.RaycastingScene()
 _ = scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(hull))
 
-o3d.visualization.draw_geometries([hull])
-#
-# print(point_data.shape)
-#
-# attraction_pts = []
-# for i in range(0,point_data.shape[0],2):
-#     attraction_pts.append(Attractor(point_data[i]))
+points_inside_sphere = []
+for i in range(2000):
+    points_inside_sphere.append(get_random_point_in_sphere(0.5))
 
-# Add points inside
-# points_inside_sphere = []
-# for i in range(2000):
-#     points_inside_sphere.append(get_random_point_in_sphere(0.5))
-#
-# occ_test = scene.compute_occupancy(np.array(points_inside_sphere, dtype='float32'))
-# for i in range(2000):
-#     if occ_test[i] == 1.0:
-#         attraction_pts.append(Attractor(points_inside_sphere[i]))
+occ_test = scene.compute_occupancy(np.array(points_inside_sphere, dtype='float32'))
+for i in range(2000):
+    if occ_test[i] == 1.0:
+        attraction_pts.append(Attractor(points_inside_sphere[i]))
 
 # Add mid axis
-# for i in np.linspace(0,1,30):
-#     attraction_pts.append(Attractor(np.array([0, 0, i])))
-#
-# attraction_pts.append(Attractor(np.array([0, 0, -0.5])))
-# attraction_pts.append(Attractor(np.array([0, 0, -0.6])))
-# attraction_pts.append(Attractor(np.array([0, 0, -0.7])))
-# attraction_pts.append(Attractor(np.array([0, 0, -0.8])))
+for i in np.linspace(0,1,30):
+    attraction_pts.append(Attractor(np.array([0, 0, i])))
 
-# root_pos = np.array([0,0,-0.1])
-# root_heading = np.array([0.0,0.0,1.0])
+
+root_pos = np.array([0.0, 0.0, -0.1])
+root_heading = np.array([0.0,0.0,1.0])
+scab = SpaceColonizationWithBuds(attraction_pts,root_pos,root_heading)
+
+step = 1
+
+
+def advance_key_callback(vis: o3d.visualization.Visualizer):
+    vis.clear_geometries()
+    scab.update()
+    for geom in scab.visualize_with_spheres():
+        vis.add_geometry(geom, reset_bounding_box=False)
+
+
+def generate_captures_callback(vis: o3d.visualization.Visualizer):
+    step = 1
+    while scab.update():
+        vis.clear_geometries()
+        for geom in scab.visualize_with_spheres():
+            vis.add_geometry(geom, reset_bounding_box=False)
+        if step % 5 == 0:
+            vis.capture_screen_image(f"captures/scab/{step}.png", do_render=True)
+        step += 1
+
+
+def run_key_callback(vis: o3d.visualization.Visualizer):
+    vis.clear_geometries()
+    scab.run()
+    for geom in scab.visualize_with_spheres():
+        vis.add_geometry(geom, reset_bounding_box=False)
+
+
+def generate_mesh_key_callback(vis: o3d.visualization.Visualizer):
+    vis.clear_geometries()
+    skeleton = scab.get_skeleton()
+    for seg in skeleton:
+        m = generate_sweep_surface(seg)
+        vis.add_geometry(m, reset_bounding_box=False)
+
+
+def draw_only_skeleton_callback(vis: o3d.visualization.Visualizer):
+    vis.clear_geometries()
+    for geom in scab.visualize_with_spheres(draw_buds=False, draw_attractors=False):
+        vis.add_geometry(geom, reset_bounding_box=False)
+
+
+key_to_callback = {ord("A"): advance_key_callback, ord("D"): run_key_callback, ord("F"): generate_mesh_key_callback, ord("G"): generate_captures_callback,
+                   ord("H"): draw_only_skeleton_callback}
+o3d.visualization.draw_geometries_with_key_callbacks(scab.visualize_with_spheres(), key_to_callback)
+
 # print("Running SCA...")
 # scab = SpaceColonizationWithBuds(attraction_pts, root_pos, root_heading)
 # sca.run()
 # skeleton = sca.get_skeleton()
 # #
-# all_sweep_meshes = []
-# for seg in skeleton:
-#     print(seg)
-#     m = generate_sweep_surface(seg)
-#     all_sweep_meshes.append(m)
+
 # # all_sweep_meshes.append(generate_sweep_surface(skeleton[0]))
 # o3d.visualization.draw_geometries(all_sweep_meshes)
-
-# def advance_key_callback(vis: o3d.visualization.Visualizer):
-#     vis.clear_geometries()
-#     scab.update()
-#     for geom in scab.visualize_with_spheres():
-#         vis.add_geometry(geom, reset_bounding_box=False)
-#
-#
-# def run_key_callback(vis: o3d.visualization.Visualizer):
-#     vis.clear_geometries()
-#     scab.run()
-#     for geom in scab.visualize_with_spheres():
-#         vis.add_geometry(geom, reset_bounding_box=False)
-#
-#
-# key_to_callback = {ord("A"): advance_key_callback, ord("D"): run_key_callback}
-# o3d.visualization.draw_geometries_with_key_callbacks(scab.visualize_with_spheres(), key_to_callback)

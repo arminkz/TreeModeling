@@ -1,4 +1,5 @@
 import numpy as np
+import open3d as o3d
 
 from scipy.spatial import KDTree
 from .attractor import Attractor
@@ -106,9 +107,9 @@ class SpaceColonization:
             elif len(node.children) == 1:
                 thickness = set_thickness_values(node.children[0])
             else:
-                thickness = 0.5
+                thickness = 1.0
                 for child in node.children:
-                    thickness += 0.5 * set_thickness_values(child)
+                    thickness += 0.02 * set_thickness_values(child)
             node.thickness = thickness
             return thickness
 
@@ -143,3 +144,36 @@ class SpaceColonization:
         new_segment(self.root_node, parent_element=None)
 
         return all_segments
+
+
+    def draw_point(self, pt, color):
+        s = o3d.geometry.TriangleMesh.create_sphere(radius=0.005)
+        s.paint_uniform_color(color)
+        s.compute_vertex_normals()
+        s.translate(pt)
+        return s
+
+    def visualize_with_spheres(self):
+        # Define some colors
+        color_dark = [0.1, 0.1, 0.1]
+        color_red = [1, 0, 0]
+        color_green = [0, 1, 0]
+        color_yellow = [1, 1, 0]
+        color_blue = [0, 0, 1]
+
+        # Drawing code
+        all_drawables = []
+        # all_drawables.append(draw_coordinate_box())
+
+        # Draw attraction points
+        for ap in self.attraction_points:
+            if len(ap.influencing_nodes) > 0:
+                all_drawables.append(self.draw_point(ap.position, color_blue))
+            else:
+                all_drawables.append(self.draw_point(ap.position, color_dark))
+
+        # Draw nodes
+        for n in self.nodes:
+            all_drawables.append(self.draw_point(n.position, color_red))
+
+        return all_drawables
